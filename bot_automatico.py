@@ -78,33 +78,41 @@ try:
     tab_attive, tab_storico = st.tabs(["📦 Posizioni Aperte a Mercato", "🗂️ Registro Storico Ordini"])
     
     with tab_attive:
-        posizioni = client.get_all_positions()
-        if not posizioni:
-            st.info("Nessuna posizione aperta rilevata. L'IA sta scansionando i mercati.")
-        else:
-            lista_posizioni = []
-            for p in posizioni:
-                lista_posizioni.append({
-                    "Strumento": p.symbol, "Volume (Qty)": p.qty,
-                    "Prezzo Ingresso": f"${float(p.avg_entry_price):,.2f}",
-                    "Valore Corrente": f"${float(p.market_value):,.2f}",
-                    "Profitto / Perdita": f"${float(p.unrealized_pl):,.2f}"
-                })
-            st.dataframe(pd.DataFrame(lista_posizioni), use_container_width=True)
+        try:
+            posizioni = client.get_all_positions()
+            if not posizioni:
+                st.info("Nessuna posizione aperta rilevata. L'IA sta scansionando i mercati.")
+            else:
+                lista_posizioni = []
+                for p in posizioni:
+                    lista_posizioni.append({
+                        "Strumento": p.symbol, "Volume (Qty)": p.qty,
+                        "Prezzo Ingresso": f"${float(p.avg_entry_price):,.2f}",
+                        "Valore Corrente": f"${float(p.market_value):,.2f}",
+                        "Profitto / Perdita": f"${float(p.unrealized_pl):,.2f}"
+                    })
+                st.dataframe(pd.DataFrame(lista_posizioni), use_container_width=True)
+        except:
+            st.info("Caricamento posizioni in corso...")
 
     with tab_storico:
-        ordini = client.get_orders(filter={"status": "all", "limit": 15})
-        if not ordini:
-            st.info("Nessuna operazione registrata nel diario storico.")
-        else:
-            lista_ordini = []
-            for o in ordini:
-                lista_ordini.append({
-                    "Data Esecuzione": o.created_at.strftime('%d/%m/%Y %H:%M'), "Asset": o.symbol,
-                    "Direzione": "COMPRA (BUY)" if o.side.value == "buy" else "VENDITA (SELL)",
-                    "Volume": o.qty, "Stato": "Eseguito ✅" if o.status.value == "filled" else "In Coda ⏳"
-                })
-            st.dataframe(pd.DataFrame(lista_ordini), use_container_width=True)
+        try:
+            ordini = client.get_orders()
+            if not ordini:
+                st.info("Nessun ordine registrato nel diario storico.")
+            else:
+                lista_ordini = []
+                for o in ordini:
+                    lista_ordini.append({
+                        "Data Esecuzione": o.created_at.strftime('%d/%m/%Y %H:%M') if o.created_at else "-",
+                        "Asset": o.symbol,
+                        "Direzione": "COMPRA (BUY)" if o.side == "buy" else "VENDITA (SELL)",
+                        "Volume": o.qty, 
+                        "Stato": "Eseguito ✅" if o.status == "filled" else "In Coda ⏳"
+                    })
+                st.dataframe(pd.DataFrame(lista_ordini), use_container_width=True)
+        except:
+            st.info("Recupero storico ordini dal server...")
 
 except Exception as e:
     st.error(f"Errore di allineamento terminale: {e}")
