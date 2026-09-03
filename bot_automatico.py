@@ -8,21 +8,8 @@ from alpaca.data.requests import CryptoBarsRequest, StockBarsRequest
 from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
 from datetime import datetime, timedelta, timezone
 
-# 🎨 Configurazione Layout Professionale (Look Total Black Capital.com)
-st.set_page_config(page_title="Mio Broker Privato IA", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Terminal Pro IA", layout="wide", initial_sidebar_state="expanded")
 
-st.markdown("""
-    <style>
-    .main { background-color: #0c0d12; color: #e4e6eb; font-family: 'Roboto', sans-serif; }
-    header { background-color: #14161f !important; }
-    .css-1d391kg { background-color: #14161f; }
-    .stTabs [data-baseweb="tab-list"] { background-color: #14161f; }
-    .stTabs [data-baseweb="tab"] { color: #8a8f9d; }
-    .stTabs [aria-selected="true"] { color: #26a69a !important; font-weight: bold; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- INFRASTRUTTURA DI BACKEND ---
 API_KEY = "PKGBTKR5UFADYCUR2QYPXU45MN"
 SECRET_KEY = "HWnrgJW7UxCUEDnEfkEatRiPQPE2yAukjVEWPkFtahcZ"
 
@@ -30,62 +17,47 @@ try:
     client = TradingClient(api_key=API_KEY, secret_key=SECRET_KEY, paper=True)
     crypto_data_client = CryptoHistoricalDataClient()
     stock_data_client = StockHistoricalDataClient(api_key=API_KEY, secret_key=SECRET_KEY)
-    
     account = client.get_account()
     saldo_reale = float(account.cash)
     valore_portafoglio = float(account.portfolio_value)
     guadagno_totale = valore_portafoglio - 100000.0
 
-    # 🖥️ BARRA LATERALE: PANNELLO DI WALLET (Stile Capital.com)
-    st.sidebar.markdown("<h2 style='color:#26a69a; text-align:center;'>💳 PORTAFOGLIO PERSONALE</h2>", unsafe_allow_html=True)
-    st.sidebar.markdown("---")
-    st.sidebar.metric(label="Saldo Disponibile", value=f"${saldo_reale:,.2f}")
-    st.sidebar.metric(label="Conto di Trading (Valore Netto)", value=f"${valore_portafoglio:,.2f}")
-    
-    if guadagno_totale >= 0:
-        st.sidebar.success(f"📈 Profitto Generato dall'IA: +${guadagno_totale:,.2f}")
-    else:
-        st.sidebar.error(f"📉 Variazione di Portafoglio: ${guadagno_totale:,.2f}")
+    st.sidebar.markdown("### 💳 ACCOUNT WALLET")
+    st.sidebar.metric(label="Cash", value=f"${saldo_reale:,.2f}")
+    st.sidebar.metric(label="Portafoglio", value=f"${valore_portafoglio:,.2f}")
+    st.sidebar.metric(label="Profitto IA", value=f"${guadagno_totale:,.2f}")
     
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 📥 Deposito Fondi")
-    deposito = st.sidebar.number_input("Digita importo da ricaricare ($):", min_value=10.0, step=10.0, key="dep")
-    if st.sidebar.button("Conferma Deposito con Carta"):
-        st.sidebar.info(f"Connessione protetta con il gateway di pagamento per l'importo di ${deposito}...")
+    deposito = st.sidebar.number_input("Carica fondi ($):", min_value=10.0, step=50.0, key="dep")
+    if st.sidebar.button("Deposita con Stripe", use_container_width=True):
+        st.sidebar.info(f"🔄 Connessione gateway per ${deposito}...")
         
-    st.sidebar.markdown("### 📤 Prelievo Fondi")
-    prelievo = st.sidebar.number_input("Digita importo da prelevare ($):", min_value=10.0, max_value=saldo_reale if saldo_reale > 10 else 10.0, step=10.0, key="prel")
-    if st.sidebar.button("Invia Fondi su Carta"):
-        st.sidebar.success(f"Richiesta inoltrata! Riscossione di ${prelievo} inviata alla tua carta.")
+    prelievo = st.sidebar.number_input("Preleva fondi ($):", min_value=10.0, max_value=saldo_reale if saldo_reale > 10 else 10.0, step=50.0, key="prel")
+    if st.sidebar.button("Conferma Prelievo", use_container_width=True):
+        st.sidebar.success(f"✅ Richiesta inviata.")
 
-    # 📈 CORPO CENTRALE PRINCIPALE
-    st.markdown("<h1 style='color:#e4e6eb;'>📊 Plancia Proprietaria di Trading Avanzato</h1>", unsafe_allow_html=True)
+    st.markdown("# 📊 Terminale di Trading Proprietario")
     st.markdown("---")
     
     col_grafico, col_ia = st.columns(2)
     
     with col_ia:
-        st.markdown("<h3 style='color:#26a69a;'>🧠 Algoritmo IA Organico</h3>", unsafe_allow_html=True)
-        asset_selezionato = st.selectbox("Seleziona mercato per analisi IA:", ["BTC/USD", "ETH/USD", "TSLA", "NVDA", "AAPL"])
-        st.markdown(f"**Ultimo screening:** {datetime.now().strftime('%H:%M:%S')}")
-        st.markdown("---")
+        st.markdown("### 🤖 ALGORITMO")
+        asset_selezionato = st.selectbox("Strumento:", ["BTC/USD", "ETH/USD", "TSLA", "NVDA", "AAPL"])
         
-        st.markdown("<h4>🔮 Previsione Corrente</h4>", unsafe_allow_html=True)
         if asset_selezionato in ["BTC/USD", "TSLA", "ETH/USD"]:
-            st.metric(label="Direzione Stimata", value="BULLISH (BUY)", delta="IA in posizione Long")
+            st.success("🔥 Segnale Corrente: BULLISH (BUY)")
         else:
-            st.metric(label="Direzione Stimata", value="BEARISH (SELL)", delta="- IA in posizione Short", delta_color="inverse")
+            st.error("❄️ Segnale Corrente: BEARISH (SELL)")
         
-        st.markdown("---")
         importo_dinamico = saldo_reale * 0.20
         if importo_dinamico < 10: importo_dinamico = 10
-        st.write(f"💼 **Budget di Trade Attuale:** ${importo_dinamico:,.2f} *(Ricalcolato in base all'interesse composto)*")
+        st.metric(label="Budget Dinamico (20%)", value=f"${importo_dinamico:,.2f}")
 
     with col_grafico:
-        st.markdown("<h3 style='color:#e4e6eb;'>📈 Grafico Interattivo Real-Time</h3>", unsafe_allow_html=True)
-        
+        st.markdown("### 📈 GRAFICO LIVE")
         fine = datetime.now(timezone.utc) - timedelta(minutes=15)
-        inizio = fine - timedelta(days=60)
+        inizio = fine - timedelta(days=45)
         
         try:
             if "/" in asset_selezionato:
@@ -104,58 +76,54 @@ try:
                 
             fig = god.Figure(data=[god.Candlestick(
                 x=dati_grafico['timestamp'], open=dati_grafico['open'], high=dati_grafico['high'], low=dati_grafico['low'], close=dati_grafico['close'],
-                increasing_line_color='#26a69a', decreasing_line_color='#ef5350'
+                increasing_line_color='#2ec4b6', decreasing_line_color='#e63946',
+                increasing_fill_color='#2ec4b6', decreasing_fill_color='#e63946', line_width=2
             )])
-            fig.update_layout(plot_bgcolor='#131722', paper_bgcolor='#131722', font_color='#d1d4dc', xaxis_rangeslider_visible=False, height=400, margin=dict(l=10, r=10, t=10, b=10))
+            
+            fig.update_layout(xaxis_rangeslider_visible=False, height=400, margin=dict(l=10, r=10, t=10, b=10))
             st.plotly_chart(fig, use_container_width=True)
-        except:
-            st.info("Caricamento dati del grafico in corso...")
+        except Exception as e:
+            st.info("Connessione ai nodi di borsa...")
 
-    # --- 📊 SEZIONE DI CONTROLLO OPERAZIONI ---
     st.markdown("---")
-    st.markdown("<h2 style='color:#e4e6eb;'>📜 Registro dei Contratti e Storico Fondi</h2>", unsafe_allow_html=True)
+    st.markdown("## 📜 REGISTRO OPERATIVO")
     
-    tab_attive, tab_storico = st.tabs(["📦 Posizioni Aperte", "🗂️ Registro Storico Ordini"])
+    tab_attive, tab_storico = st.tabs(["📦 Posizioni Aperte", "🗂️ Registro Storico"])
     
     with tab_attive:
         try:
             posizioni = client.get_all_positions()
             if not posizioni:
-                st.info("Nessuna operazione aperta in questo momento. L'IA è in attesa del momento giusto.")
+                st.info("Nessuna posizione aperta rilevata.")
             else:
                 lista_posizioni = []
                 for p in posizioni:
                     lista_posizioni.append({
-                        "Asset": p.symbol,
-                        "Esposizione (Quantità)": p.qty,
-                        "Prezzo Medio d'Ingresso": f"${float(p.avg_entry_price):,.2f}",
-                        "Valore di Mercato Corrente": f"${float(p.market_value):,.2f}",
-                        "P&L Non Realizzato (Guadagno)": f"${float(p.unrealized_pl):,.2f}"
+                        "Strumento": p.symbol, "Volume": p.qty,
+                        "Ingresso": f"${float(p.avg_entry_price):,.2f}",
+                        "Corrente": f"${float(p.market_value):,.2f}",
+                        "P&L": f"${float(p.unrealized_pl):,.2f}"
                     })
-                df_pos = pd.DataFrame(lista_posizioni)
-                st.dataframe(df_pos, use_container_width=True)
+                st.dataframe(pd.DataFrame(lista_posizioni), use_container_width=True)
         except:
-            st.info("Sincronizzazione dei contratti in tempo reale...")
+            st.info("Recupero posizioni...")
 
     with tab_storico:
         try:
-            ordini = client.get_orders(filter={"status": "all", "limit": 20})
+            ordini = client.get_orders(filter={"status": "all", "limit": 15})
             if not ordini:
-                st.info("Nessun ordine presente nello storico del conto.")
+                st.info("Nessuna operazione nel diario storico.")
             else:
                 lista_ordini = []
                 for o in ordini:
                     lista_ordini.append({
-                        "Data e Ora Esecuzione": o.created_at.strftime('%d/%m/%Y %H:%M'),
-                        "Asset di Riferimento": o.symbol,
-                        "Direzione Trade": "ACQUISTO (BUY)" if o.side.value == "buy" else "VENDITA (SELL)",
-                        "Volume Scambiato": o.qty,
-                        "Esito Operazione": "Completato ✅" if o.status.value == "filled" else "In attesa ⏳"
+                        "Data": o.created_at.strftime('%d/%m/%Y %H:%M'), "Asset": o.symbol,
+                        "Direzione": "BUY" if o.side.value == "buy" else "SELL",
+                        "Volume": o.qty, "Stato": "Eseguito ✅" if o.status.value == "filled" else "In Coda ⏳"
                     })
-                df_ord = pd.DataFrame(lista_ordini)
-                st.dataframe(df_ord, use_container_width=True)
+                st.dataframe(pd.DataFrame(lista_ordini), use_container_width=True)
         except:
-            st.info("Aggiornamento del registro storico...")
+            st.info("Recupero storico ordini...")
 
 except Exception as e:
-    st.error(f"Piattaforma in fase di allineamento: {e}")
+    st.error(f"Errore terminale: {e}")
