@@ -1,6 +1,6 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
-from streamlit_tradingview import streamlit_tradingview
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderSide
 
@@ -31,20 +31,10 @@ try:
 
     st.markdown("<div style='padding: 10px 20px; background:#f8f9fd; border-bottom:1px solid #e0e3eb; font-size:13px;'>💼 <b>Money Management Attivo:</b> Budget Dinamico Interesse Composto (20%): <b>$" + f"{importo_dinamico:,.2f}" + "</b></div>", unsafe_allow_html=True)
 
-    # --- 📈 IL VERO GRAFICO INTERATTIVO SBLOCCATO VIA COMPONENTE NATIVO ---
-    streamlit_tradingview(
-        symbol="BINANCE:BTCUSDT",
-        interval="1",
-        timezone="Europe/Rome",
-        theme="dark",
-        style="1",
-        locale="it",
-        toolbar_bg="#131722",
-        enable_publishing=False,
-        hide_side_toolbar=False,
-        allow_symbol_change=True,
-        height=600
-    )
+    # --- 📈 PANNELLO AVANZATO ORIGINALE DI TRADINGVIEW SBLOCCATO CON IFRAME NATIVO ---
+    tradingview_iframe_url = "https://tradingview.com"
+    
+    st.markdown(f'<iframe src="{tradingview_iframe_url}" width="100%" height="600" frameborder="0" allowfullscreen="true" scrolling="no" style="border:1px solid #e0e3eb; border-radius:8px;"></iframe>', unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
 
     # --- 🏦 TABELLA TOP POSITIONS STYLE ALPACA ---
