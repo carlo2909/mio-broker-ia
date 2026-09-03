@@ -1,8 +1,12 @@
 import streamlit as st
-import streamlit.components.v1 as components
+import numpy as np
 import pandas as pd
+import plotly.graph_objects as god
 from alpaca.trading.client import TradingClient
-from alpaca.trading.enums import OrderSide
+from alpaca.data.timeframe import TimeFrame
+from alpaca.data.requests import CryptoBarsRequest, StockBarsRequest
+from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
+from datetime import datetime, timedelta, timezone
 
 st.set_page_config(page_title="TradingView & Alpaca Ecosystem", layout="wide", initial_sidebar_state="collapsed")
 
@@ -24,17 +28,48 @@ SECRET_KEY = "HWnrgJW7UxCUEDnEfkEatRiPQPE2yAukjVEWPkFtahcZ"
 
 try:
     client = TradingClient(api_key=API_KEY, secret_key=SECRET_KEY, paper=True)
+    crypto_data_client = CryptoHistoricalDataClient()
+    stock_data_client = StockHistoricalDataClient(api_key=API_KEY, secret_key=SECRET_KEY)
+    
     account = client.get_account()
     saldo_reale = float(account.cash)
     importo_dinamico = saldo_reale * 0.20
     if importo_dinamico < 10: importo_dinamico = 10
 
-    st.markdown("<div style='padding: 10px 20px; background:#f8f9fd; border-bottom:1px solid #e0e3eb; font-size:13px;'>💼 <b>Money Management Attivo:</b> Budget Dinamico Interesse Composto (20%): <b>$" + f"{importo_dinamico:,.2f}" + "</b></div>", unsafe_allow_html=True)
+    st.markdown("<div style='padding: 10px 20px; background:#f8f9fd; border-bottom:1px solid #e0e3eb; font-size:13px; margin-bottom:20px;'>💼 <b>Money Management Attivo:</b> Budget Dinamico Interesse Composto (20%): <b>$" + f"{importo_dinamico:,.2f}" + "</b></div>", unsafe_allow_html=True)
 
-    # --- 📈 PANNELLO AVANZATO ORIGINALE DI TRADINGVIEW SBLOCCATO CON IFRAME NATIVO ---
-    tradingview_iframe_url = "https://tradingview.com"
+    # --- 📈 GRAFICO INTERNO NATIVO IN STILE TRADINGVIEW SCURO ---
+    st.markdown("<h3 style='font-size: 16px; font-weight: 600; color: #131722; margin-left: 10px;'>📊 GRAFICO A CANDELE (REAL-TIME FEED)</h3>", unsafe_allow_html=True)
     
-    st.markdown(f'<iframe src="{tradingview_iframe_url}" width="100%" height="600" frameborder="0" allowfullscreen="true" scrolling="no" style="border:1px solid #e0e3eb; border-radius:8px;"></iframe>', unsafe_allow_html=True)
+    fine = datetime.now(timezone.utc) - timedelta(minutes=15)
+    inizio = fine - timedelta(days=45)
+    
+    try:
+        request_params = CryptoBarsRequest(symbol_or_symbols="BTC/USD", timeframe=TimeFrame.Day, start=inizio, end=fine)
+        bars = crypto_data_client.get_crypto_bars(request_params)
+        dati = bars.df
+        if isinstance(dati.index, pd.MultiIndex):
+            dati = dati.xs("BTC/USD", level=0)
+            
+        dati_grafico = dati.reset_index()
+        dati_grafico['timestamp'] = pd.to_datetime(dati_grafico['timestamp']).dt.date
+            
+        fig = god.Figure(data=[god.Candlestick(
+            x=dati_grafico['timestamp'], open=dati_grafico['open'], high=dati_grafico['high'], low=dati_grafico['low'], close=dati_grafico['close'],
+            increasing_line_color='#2ec4b6', decreasing_line_color='#e63946',
+            increasing_fill_color='#2ec4b6', decreasing_fill_color='#e63946', line_width=1.8
+        )])
+        
+        fig.update_layout(
+            plot_bgcolor='#131722', paper_bgcolor='#131722', font_color='#8a8f9d',
+            xaxis_rangeslider_visible=False, height=450, margin=dict(l=10, r=10, t=10, b=10),
+            xaxis=dict(gridcolor='#191b28', showgrid=True, zeroline=False),
+            yaxis=dict(gridcolor='#191b28', showgrid=True, zeroline=False, side='right')
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    except:
+        st.info("Caricamento dati di mercato del grafico...")
+        
     st.markdown("<br>", unsafe_allow_html=True)
 
     # --- 🏦 TABELLA TOP POSITIONS STYLE ALPACA ---
@@ -65,7 +100,7 @@ try:
     st.markdown("<div class='alpaca-container'>", unsafe_allow_html=True)
     st.markdown("<div class='alpaca-title'>Recent Orders <span class='sub-txt'>View All</span></div>", unsafe_allow_html=True)
     try:
-        ordini = client.get_orders(filter={"status": "all", "limit": 10})
+        ordini = client.get_orders()
         if not ordini:
             st.info("Nessun ordine recente trovato.")
         else:
