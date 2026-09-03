@@ -53,7 +53,7 @@ try:
     # 📈 CORPO PRINCIPALE: INTERFACCIA TRADINGVIEW DI RICERCA
     st.markdown("<h1 style='color:#d1d4dc; font-family:sans-serif;'>📊 Piattaforma TradingView IA Private</h1>", unsafe_allow_html=True)
     
-    col_grafico, col_ia = st.columns([3, 1])
+    col_grafico, col_ia = st.columns()
     
     with col_ia:
         st.markdown("<h3 style='color:#d1d4dc;'>🔎 Cerca Mercato</h3>", unsafe_allow_html=True)
@@ -123,7 +123,7 @@ try:
         else:
             st.metric(label="Previsione di Mercato", value="BEARISH (SELL)", delta="- Segnale di Vendita", delta_color="inverse")
 
-        # Gestione automatica del budget
+        # Gestione automatica del budget tarata a 10$ per simulare il conto da 50€
         tif = TimeInForce.GTC if "/" in ticker_cercato else TimeInForce.DAY
         try:
             posizione_reale = client.get_open_position(ticker_cercato)
@@ -133,10 +133,11 @@ try:
         except:
             if previsione == 1:
                 prezzo_attuale = float(dati["close"].iloc[-1])
-                qty_calcolata = round(20000 / prezzo_attuale, 4) if "/" in ticker_cercato else round(20000 / prezzo_attuale, 2)
+                qty_calcolata = round(10 / prezzo_attuale, 4) if "/" in ticker_cercato else round(10 / prezzo_attuale, 2)
                 if qty_calcolata <= 0: qty_calcolata = 1
                 ordine = MarketOrderRequest(symbol=ticker_cercato, qty=qty_calcolata, side=OrderSide.BUY, time_in_force=tif)
                 client.submit_order(order_data=ordine)
 
 except Exception as e:
     st.error(f"Asset non riconosciuto o errore di sincronizzazione: {e}")
+-
