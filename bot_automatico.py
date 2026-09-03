@@ -10,7 +10,6 @@ from alpaca.data.timeframe import TimeFrame
 from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
 from sklearn.ensemble import RandomForestClassifier
 from datetime import datetime, timedelta, timezone
-import time
 
 # 🎨 Configurazione stile TradingView (Scuro e tecnico)
 st.set_page_config(page_title="TradingView IA Broker", layout="wide", initial_sidebar_state="expanded")
@@ -54,7 +53,8 @@ try:
     # 📈 CORPO PRINCIPALE: INTERFACCIA TRADINGVIEW DI RICERCA
     st.markdown("<h1 style='color:#d1d4dc; font-family:sans-serif;'>📊 Piattaforma TradingView IA Private</h1>", unsafe_allow_html=True)
     
-    col_grafico, col_ia = st.columns()
+    # Riga 54 corretta: dice a Streamlit di creare due colonne (una larga 3 per il grafico e una larga 1 per la ricerca)
+    col_grafico, col_ia = st.columns([3, 1])
     
     with col_ia:
         st.markdown("<h3 style='color:#d1d4dc;'>🔎 Cerca Mercato</h3>", unsafe_allow_html=True)
@@ -78,6 +78,7 @@ try:
         dati = dati.xs(ticker_cercato, level=0)
         
     with col_grafico:
+        # Grafico a candele TradingView Style
         fig = god.Figure(data=[god.Candlestick(
             x=dati.index, open=dati['open'], high=dati['high'], low=dati['low'], close=dati['close'],
             increasing_line_color='#26a69a', decreasing_line_color='#ef5350',
@@ -109,6 +110,7 @@ try:
     modello.fit(X_train, y_train)
     previsione = modello.predict(ultimo_giorno)
 
+    # Esecuzione Ordine e Visualizzazione Statistiche
     with col_ia:
         st.markdown("<h4 style='color:#d1d4dc;'>📦 Stato Posizione</h4>", unsafe_allow_html=True)
         try:
