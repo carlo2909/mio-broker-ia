@@ -1,9 +1,12 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as god
 from alpaca.trading.client import TradingClient
-from datetime import datetime
+from alpaca.data.timeframe import TimeFrame
+from alpaca.data.requests import CryptoBarsRequest, StockBarsRequest
+from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
+from datetime import datetime, timedelta, timezone
 
 # 🎨 Configurazione Layout Professionale (Look Total Black Capital.com)
 st.set_page_config(page_title="Mio Broker Privato IA", layout="wide", initial_sidebar_state="expanded")
@@ -19,12 +22,15 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- INFRASTRUTTURA DI BACKEND (Connessione Silenziosa ai mercati) ---
+# --- INFRASTRUTTURA DI BACKEND ---
 API_KEY = "PKGBTKR5UFADYCUR2QYPXU45MN"
 SECRET_KEY = "HWnrgJW7UxCUEDnEfkEatRiPQPE2yAukjVEWPkFtahcZ"
 
 try:
     client = TradingClient(api_key=API_KEY, secret_key=SECRET_KEY, paper=True)
+    crypto_data_client = CryptoHistoricalDataClient()
+    stock_data_client = StockHistoricalDataClient(api_key=API_KEY, secret_key=SECRET_KEY)
+    
     account = client.get_account()
     saldo_reale = float(account.cash)
     valore_portafoglio = float(account.portfolio_value)
@@ -50,64 +56,62 @@ try:
     st.sidebar.markdown("### 📤 Prelievo Fondi")
     prelievo = st.sidebar.number_input("Digita importo da prelevare ($):", min_value=10.0, max_value=saldo_reale if saldo_reale > 10 else 10.0, step=10.0, key="prel")
     if st.sidebar.button("Invia Fondi su Carta"):
-        st.sidebar.success(f"Richiesta inoltrata! Risossione di ${prelievo} inviata alla tua carta.")
+        st.sidebar.success(f"Richiesta inoltrata! Riscossione di ${prelievo} inviata alla tua carta.")
 
     # 📈 CORPO CENTRALE PRINCIPALE
     st.markdown("<h1 style='color:#e4e6eb;'>📊 Plancia Proprietaria di Trading Avanzato</h1>", unsafe_allow_html=True)
     st.markdown("---")
     
-    col_grafico, col_ia = st.columns([3, 1]) # Spazio largo per il grafico interattivo, laterale per l'IA
+    col_grafico, col_ia = st.columns(2)
     
     with col_ia:
         st.markdown("<h3 style='color:#26a69a;'>🧠 Algoritmo IA Organico</h3>", unsafe_allow_html=True)
-        asset_selezionato = st.selectbox("Seleziona mercato per analisi IA:", ["BTCUSD", "ETHUSD", "TSLA", "NVDA", "AAPL"])
+        asset_selezionato = st.selectbox("Seleziona mercato per analisi IA:", ["BTC/USD", "ETH/USD", "TSLA", "NVDA", "AAPL"])
         st.markdown(f"**Ultimo screening:** {datetime.now().strftime('%H:%M:%S')}")
         st.markdown("---")
         
         st.markdown("<h4>🔮 Previsione Corrente</h4>", unsafe_allow_html=True)
-        if asset_selezionato in ["BTCUSD", "TSLA", "ETHUSD"]:
+        if asset_selezionato in ["BTC/USD", "TSLA", "ETH/USD"]:
             st.metric(label="Direzione Stimata", value="BULLISH (BUY)", delta="IA in posizione Long")
         else:
             st.metric(label="Direzione Stimata", value="BEARISH (SELL)", delta="- IA in posizione Short", delta_color="inverse")
         
         st.markdown("---")
-        # Calcolo dinamico dell'interesse composto automatico (20% del capitale reale)
         importo_dinamico = saldo_reale * 0.20
         if importo_dinamico < 10: importo_dinamico = 10
         st.write(f"💼 **Budget di Trade Attuale:** ${importo_dinamico:,.2f} *(Ricalcolato in base all'interesse composto)*")
 
     with col_grafico:
-        st.markdown("<h3 style='color:#e4e6eb;'>📈 Grafico Interattivo Real-Time (Candele al Minuto)</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color:#e4e6eb;'>📈 Grafico Interattivo Real-Time</h3>", unsafe_allow_html=True)
         
-        # INNESTO DEL GRAPHIC ENGINE DI TRADINGVIEW CON STRUMENTI DI DISEGNO E FIBONACCI
-        tradingview_widget_code = f"""
-        <div class="tradingview-widget-container" style="height:100%;width:100%">
-          <div id="tradingview_pro_chart" style="height:500px;width:100%"></div>
-          <script type="text/javascript" src="https://tradingview.com"></script>
-          <script type="text/javascript">
-          new TradingView.widget({{
-            "autosize": true,
-            "symbol": "BINANCE:{asset_selezionato}T" if "{asset_selezionato}".includes("USD") else "NASDAQ:{asset_selezionato}",
-            "interval": "1",
-            "timezone": "Europe/Rome",
-            "theme": "dark",
-            "style": "1",
-            "locale": "it",
-            "toolbar_bg": "#14161f",
-            "enable_publishing": false,
-            "hide_side_toolbar": false,
-            "allow_symbol_change": true,
-            "studies": [
-              "MASimple@tv-basicstudies"
-            ],
-            "container_id": "tradingview_pro_chart"
-          }});
-          </script>
-        </div>
-        """
-        components.html(tradingview_widget_code, height=520)
+        fine = datetime.now(timezone.utc) - timedelta(minutes=15)
+        inizio = fine - timedelta(days=60)
+        
+        try:
+            if "/" in asset_selezionato:
+                request_params = CryptoBarsRequest(symbol_or_symbols=asset_selezionato, timeframe=TimeFrame.Day, start=inizio, end=fine)
+                bars = crypto_data_client.get_crypto_bars(request_params)
+            else:
+                request_params = StockBarsRequest(symbol_or_symbols=asset_selezionato, timeframe=TimeFrame.Day, start=inizio, end=fine)
+                bars = stock_data_client.get_stock_bars(request_params)
+                
+            dati = bars.df
+            if isinstance(dati.index, pd.MultiIndex):
+                dati = dati.xs(asset_selezionato, level=0)
+                
+            dati_grafico = dati.reset_index()
+            dati_grafico['timestamp'] = pd.to_datetime(dati_grafico['timestamp']).dt.date
+                
+            fig = god.Figure(data=[god.Candlestick(
+                x=dati_grafico['timestamp'], open=dati_grafico['open'], high=dati_grafico['high'], low=dati_grafico['low'], close=dati_grafico['close'],
+                increasing_line_color='#26a69a', decreasing_line_color='#ef5350'
+            )])
+            fig.update_layout(plot_bgcolor='#131722', paper_bgcolor='#131722', font_color='#d1d4dc', xaxis_rangeslider_visible=False, height=400, margin=dict(l=10, r=10, t=10, b=10))
+            st.plotly_chart(fig, use_container_width=True)
+        except:
+            st.info("Caricamento dati del grafico in corso...")
 
-    # --- 📊 SEZIONE DI CONTROLLO OPERAZIONI (Stile Capital.com) ---
+    # --- 📊 SEZIONE DI CONTROLLO OPERAZIONI ---
     st.markdown("---")
     st.markdown("<h2 style='color:#e4e6eb;'>📜 Registro dei Contratti e Storico Fondi</h2>", unsafe_allow_html=True)
     
