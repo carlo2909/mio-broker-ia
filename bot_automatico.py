@@ -140,4 +140,3 @@ try:
 
 except Exception as e:
     st.error(f"Asset non riconosciuto o errore di sincronizzazione: {e}")
--
