@@ -1,4 +1,3 @@
 pandas
+plotly
 alpaca-py
-streamlit
-streamlit-tradingview
