@@ -1,118 +1,110 @@
 import streamlit as st
-import numpy as np
+import streamlit.components.v1 as components
 import pandas as pd
-import plotly.graph_objects as god
 from alpaca.trading.client import TradingClient
-from alpaca.data.timeframe import TimeFrame
-from alpaca.data.requests import CryptoBarsRequest, StockBarsRequest
-from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
-from datetime import datetime, timedelta, timezone
+from alpaca.trading.enums import OrderSide
 
-st.set_page_config(page_title="Terminal Pro IA", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="TradingView & Alpaca Ecosystem", layout="wide", initial_sidebar_state="collapsed")
+
+st.markdown("""
+    <style>
+    .main { background-color: #ffffff; color: #131722; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    header { background-color: #ffffff !important; border-bottom: 1px solid #e0e3eb; }
+    .alpaca-container { background: #ffffff; padding: 24px; border: 1px solid #e0e3eb; border-radius: 8px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .alpaca-title { font-size: 18px; font-weight: 600; color: #131722; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+    .sub-txt { font-size: 12px; color: #787b86; font-weight: 400; }
+    .stDataFrame table { border-collapse: collapse; width: 100%; }
+    .stDataFrame th { background-color: #f8f9fd !important; color: #606266 !important; font-weight: 600 !important; font-size: 13px !important; border-bottom: 1px solid #e0e3eb !important; padding: 12px !important; }
+    .stDataFrame td { padding: 12px !important; font-size: 13px !important; border-bottom: 1px solid #f0f3fa !important; padding: 12px !important; }
+    </style>
+    """, unsafe_allow_html=True)
 
 API_KEY = "PKGBTKR5UFADYCUR2QYPXU45MN"
 SECRET_KEY = "HWnrgJW7UxCUEDnEfkEatRiPQPE2yAukjVEWPkFtahcZ"
 
 try:
     client = TradingClient(api_key=API_KEY, secret_key=SECRET_KEY, paper=True)
-    crypto_data_client = CryptoHistoricalDataClient()
-    stock_data_client = StockHistoricalDataClient(api_key=API_KEY, secret_key=SECRET_KEY)
     account = client.get_account()
     saldo_reale = float(account.cash)
-    valore_portafoglio = float(account.portfolio_value)
-    guadagno_totale = valore_portafoglio - 100000.0
-
-    st.sidebar.markdown("### 💳 ACCOUNT WALLET")
-    st.sidebar.metric(label="Cash Disponibile", value=f"${saldo_reale:,.2f}")
-    st.sidebar.metric(label="Valore Portafoglio", value=f"${valore_portafoglio:,.2f}")
-    st.sidebar.metric(label="Profitto Totale IA", value=f"${guadagno_totale:,.2f}")
-
-    st.markdown("# 📊 Terminale di Trading Proprietario Premium")
-    st.markdown("---")
-    
-    asset_selezionato = st.selectbox("Seleziona lo Strumento da visualizzare:", ["BTC/USD", "ETH/USD", "TSLA", "NVDA", "AAPL"])
-    
-    if asset_selezionato in ["BTC/USD", "TSLA", "ETH/USD"]:
-        st.success("🔥 Segnale Corrente Algoritmo: BULLISH (BUY) - IA in posizione Long")
-    else:
-        st.error("❄️ Segnale Corrente Algoritmo: BEARISH (SELL) - IA Flat")
-        
     importo_dinamico = saldo_reale * 0.20
     if importo_dinamico < 10: importo_dinamico = 10
-    st.metric(label="Budget Dinamico Calcolato per il prossimo Trade (20%)", value=f"${importo_dinamico:,.2f}")
-    
-    st.markdown("### 📈 GRAFICO A CANDELE PROFESSIONALE (REAL-TIME FEED)")
-    fine = datetime.now(timezone.utc) - timedelta(minutes=15)
-    inizio = fine - timedelta(days=45)
-    
-    if "/" in asset_selezionato:
-        request_params = CryptoBarsRequest(symbol_or_symbols=asset_selezionato, timeframe=TimeFrame.Day, start=inizio, end=fine)
-        bars = crypto_data_client.get_crypto_bars(request_params)
-    else:
-        request_params = StockBarsRequest(symbol_or_symbols=asset_selezionato, timeframe=TimeFrame.Day, start=inizio, end=fine)
-        bars = stock_data_client.get_stock_bars(request_params)
-        
-    dati = bars.df
-    if isinstance(dati.index, pd.MultiIndex):
-        dati = dati.xs(asset_selezionato, level=0)
-        
-    dati_grafico = dati.reset_index()
-    dati_grafico['timestamp'] = pd.to_datetime(dati_grafico['timestamp']).dt.date
-        
-    fig = god.Figure(data=[god.Candlestick(
-        x=dati_grafico['timestamp'], open=dati_grafico['open'], high=dati_grafico['high'], low=dati_grafico['low'], close=dati_grafico['close'],
-        increasing_line_color='#2ec4b6', decreasing_line_color='#e63946', line_width=2
-    )])
-    
-    fig.update_layout(
-        plot_bgcolor='#0c0d14', paper_bgcolor='#0c0d14', font_color='#8a8f9d',
-        xaxis_rangeslider_visible=False, height=500, margin=dict(l=10, r=10, t=10, b=10),
-        xaxis=dict(gridcolor='#191b28', showgrid=True, zeroline=False),
-        yaxis=dict(gridcolor='#191b28', showgrid=True, zeroline=False, side='right')
-    )
-    st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown("---")
-    st.markdown("## 📜 REGISTRO OPERATIVO DELLE POSIZIONI IN CLOUD")
-    
-    tab_attive, tab_storico = st.tabs(["📦 Posizioni Aperte a Mercato", "🗂️ Registro Storico Ordini"])
-    
-    with tab_attive:
-        try:
-            posizioni = client.get_all_positions()
-            if not posizioni:
-                st.info("Nessuna posizione aperta rilevata. L'IA sta scansionando i mercati.")
-            else:
-                lista_posizioni = []
-                for p in posizioni:
-                    lista_posizioni.append({
-                        "Strumento": p.symbol, "Volume (Qty)": p.qty,
-                        "Prezzo Ingresso": f"${float(p.avg_entry_price):,.2f}",
-                        "Valore Corrente": f"${float(p.market_value):,.2f}",
-                        "Profitto / Perdita": f"${float(p.unrealized_pl):,.2f}"
-                    })
-                st.dataframe(pd.DataFrame(lista_posizioni), use_container_width=True)
-        except:
-            st.info("Caricamento posizioni in corso...")
+    st.markdown("<div style='padding: 10px 20px; background:#f8f9fd; border-bottom:1px solid #e0e3eb; font-size:13px;'>💼 <b>Money Management Attivo:</b> Budget Dinamico Interesse Composto (20%): <b>$" + f"{importo_dinamico:,.2f}" + "</b></div>", unsafe_allow_html=True)
 
-    with tab_storico:
-        try:
-            ordini = client.get_orders()
-            if not ordini:
-                st.info("Nessun ordine registrato nel diario storico.")
-            else:
-                lista_ordini = []
-                for o in ordini:
-                    lista_ordini.append({
-                        "Data Esecuzione": o.created_at.strftime('%d/%m/%Y %H:%M') if o.created_at else "-",
-                        "Asset": o.symbol,
-                        "Direzione": "COMPRA (BUY)" if o.side == "buy" else "VENDITA (SELL)",
-                        "Volume": o.qty, 
-                        "Stato": "Eseguito ✅" if o.status == "filled" else "In Coda ⏳"
-                    })
-                st.dataframe(pd.DataFrame(lista_ordini), use_container_width=True)
-        except:
-            st.info("Recupero storico ordini dal server...")
+    tradingview_advanced_html = """
+    <div class="tradingview-widget-container" style="height:620px;width:100%">
+      <div id="tv_advanced_platform" style="height:620px;width:100%"></div>
+      <script type="text/javascript" src="https://tradingview.com"></script>
+      <script type="text/javascript">
+      new TradingView.widget({
+        "autosize": true,
+        "symbol": "BINANCE:BTCUSDT",
+        "interval": "1",
+        "timezone": "Europe/Rome",
+        "theme": "dark",
+        "style": "1",
+        "locale": "it",
+        "toolbar_bg": "#131722",
+        "enable_publishing": false,
+        "hide_side_toolbar": false,
+        "allow_symbol_change": true,
+        "save_image": true,
+        "studies": ["MASimple@tv-basicstudies", "RSI@tv-basicstudies"],
+        "container_id": "tv_advanced_platform"
+      });
+      </script>
+    </div>
+    """
+    components.html(tradingview_advanced_html, height=625)
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    st.markdown("<div class='alpaca-container'>", unsafe_allow_html=True)
+    st.markdown("<div class='alpaca-title'>Top Positions <span class='sub-txt'>View All</span></div>", unsafe_allow_html=True)
+    try:
+        posizioni = client.get_all_positions()
+        if not posizioni:
+            st.info("Nessuna posizione aperta in portafoglio.")
+        else:
+            lista_posizioni = []
+            for p in posizioni:
+                p_l = float(p.unrealized_pl)
+                p_l_str = f"+${p_l:,.2f}" if p_l >= 0 else f"-${abs(p_l):,.2f}"
+                lista_posizioni.append({
+                    "Asset": p.symbol,
+                    "Price": f"${float(p.current_price):,.2f}",
+                    "Qty": round(float(p.qty), 4),
+                    "Market Value": f"${float(p.market_value):,.2f}",
+                    "Total P/L ($)": p_l_str
+                })
+            st.dataframe(pd.DataFrame(lista_posizioni), use_container_width=True, hide_index=True)
+    except:
+        st.info("Caricamento posizioni attive...")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("<div class='alpaca-container'>", unsafe_allow_html=True)
+    st.markdown("<div class='alpaca-title'>Recent Orders <span class='sub-txt'>View All</span></div>", unsafe_allow_html=True)
+    try:
+        ordini = client.get_orders(filter={"status": "all", "limit": 10})
+        if not ordini:
+            st.info("Nessun ordine recente trovato.")
+        else:
+            lista_ordini = []
+            for o in ordini:
+                lista_ordini.append({
+                    "Asset": o.symbol,
+                    "Type": o.type.value.upper() if o.type else "MARKET",
+                    "Side": o.side.value.lower(),
+                    "Qty": float(o.qty) if o.qty else 0.0,
+                    "Filled Qty": float(o.filled_qty) if o.filled_qty else 0.0,
+                    "Avg Fill Price": f"${float(o.filled_avg_price):,.2f}" if o.filled_avg_price else "-",
+                    "Status": o.status.value.lower(),
+                    "Source": "access_key",
+                    "Submitted At": o.created_at.strftime('%b %d, %Y, %I:%M:%S %p') if o.created_at else "-"
+                })
+            st.dataframe(pd.DataFrame(lista_ordini), use_container_width=True, hide_index=True)
+    except:
+        st.info("Caricamento registro ordini...")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 except Exception as e:
-    st.error(f"Errore di allineamento terminale: {e}")
+    st.error(f"Terminale in fase di allineamento grafico: {e}")
