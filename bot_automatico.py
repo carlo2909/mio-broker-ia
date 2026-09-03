@@ -1,6 +1,6 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
+from streamlit_tradingview import streamlit_tradingview
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderSide
 
@@ -15,7 +15,7 @@ st.markdown("""
     .sub-txt { font-size: 12px; color: #787b86; font-weight: 400; }
     .stDataFrame table { border-collapse: collapse; width: 100%; }
     .stDataFrame th { background-color: #f8f9fd !important; color: #606266 !important; font-weight: 600 !important; font-size: 13px !important; border-bottom: 1px solid #e0e3eb !important; padding: 12px !important; }
-    .stDataFrame td { padding: 12px !important; font-size: 13px !important; border-bottom: 1px solid #f0f3fa !important; padding: 12px !important; }
+    .stDataFrame td { padding: 12px !important; font-size: 13px !important; border-bottom: 1px solid #f0f3fa !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -31,33 +31,23 @@ try:
 
     st.markdown("<div style='padding: 10px 20px; background:#f8f9fd; border-bottom:1px solid #e0e3eb; font-size:13px;'>💼 <b>Money Management Attivo:</b> Budget Dinamico Interesse Composto (20%): <b>$" + f"{importo_dinamico:,.2f}" + "</b></div>", unsafe_allow_html=True)
 
-    tradingview_advanced_html = """
-    <div class="tradingview-widget-container" style="height:620px;width:100%">
-      <div id="tv_advanced_platform" style="height:620px;width:100%"></div>
-      <script type="text/javascript" src="https://tradingview.com"></script>
-      <script type="text/javascript">
-      new TradingView.widget({
-        "autosize": true,
-        "symbol": "BINANCE:BTCUSDT",
-        "interval": "1",
-        "timezone": "Europe/Rome",
-        "theme": "dark",
-        "style": "1",
-        "locale": "it",
-        "toolbar_bg": "#131722",
-        "enable_publishing": false,
-        "hide_side_toolbar": false,
-        "allow_symbol_change": true,
-        "save_image": true,
-        "studies": ["MASimple@tv-basicstudies", "RSI@tv-basicstudies"],
-        "container_id": "tv_advanced_platform"
-      });
-      </script>
-    </div>
-    """
-    components.html(tradingview_advanced_html, height=625)
+    # --- 📈 IL VERO GRAFICO INTERATTIVO SBLOCCATO VIA COMPONENTE NATIVO ---
+    streamlit_tradingview(
+        symbol="BINANCE:BTCUSDT",
+        interval="1",
+        timezone="Europe/Rome",
+        theme="dark",
+        style="1",
+        locale="it",
+        toolbar_bg="#131722",
+        enable_publishing=False,
+        hide_side_toolbar=False,
+        allow_symbol_change=True,
+        height=600
+    )
     st.markdown("<br>", unsafe_allow_html=True)
 
+    # --- 🏦 TABELLA TOP POSITIONS STYLE ALPACA ---
     st.markdown("<div class='alpaca-container'>", unsafe_allow_html=True)
     st.markdown("<div class='alpaca-title'>Top Positions <span class='sub-txt'>View All</span></div>", unsafe_allow_html=True)
     try:
@@ -81,6 +71,7 @@ try:
         st.info("Caricamento posizioni attive...")
     st.markdown("</div>", unsafe_allow_html=True)
 
+    # --- 📜 TABELLA RECENT ORDERS STYLE ALPACA ---
     st.markdown("<div class='alpaca-container'>", unsafe_allow_html=True)
     st.markdown("<div class='alpaca-title'>Recent Orders <span class='sub-txt'>View All</span></div>", unsafe_allow_html=True)
     try:
