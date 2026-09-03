@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.graph_objects as god
 from alpaca.trading.client import TradingClient
 from alpaca.data.timeframe import TimeFrame
+from alpaca.data.requests import CryptoBarsRequest, StockBarsRequest
 from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
 from datetime import datetime, timedelta, timezone
 
@@ -57,7 +58,7 @@ try:
     # 📈 CORPO PRINCIPALE
     st.markdown("<h1 style='color:#d1d4dc; font-family:sans-serif;'>📊 Mio Broker Avanzato TradingView con IA</h1>", unsafe_allow_html=True)
     
-    col_grafico, col_ia = st.columns([2, 1])
+    col_grafico, col_ia = st.columns(2)
     
     with col_ia:
         st.markdown("<h3 style='color:#d1d4dc;'>🤖 Mente IA Private</h3>", unsafe_allow_html=True)
@@ -93,16 +94,20 @@ try:
             if isinstance(dati.index, pd.MultiIndex):
                 dati = dati.xs(asset_ia, level=0)
                 
+            # Sblocco e pulizia dell'asse del tempo per evitare i blocchi di caricamento
+            dati_grafico = dati.reset_index()
+            dati_grafico['timestamp'] = pd.to_datetime(dati_grafico['timestamp']).dt.date
+                
             fig = god.Figure(data=[god.Candlestick(
-                x=dati.index, open=dati['open'], high=dati['high'], low=dati['low'], close=dati['close'],
+                x=dati_grafico['timestamp'], open=dati_grafico['open'], high=dati_grafico['high'], low=dati_grafico['low'], close=dati_grafico['close'],
                 increasing_line_color='#26a69a', decreasing_line_color='#ef5350'
             )])
             fig.update_layout(plot_bgcolor='#131722', paper_bgcolor='#131722', font_color='#d1d4dc', xaxis_rangeslider_visible=False, height=400, margin=dict(l=10, r=10, t=10, b=10))
             st.plotly_chart(fig, use_container_width=True)
-        except:
+        except Exception as e:
             st.info("Caricamento dati del grafico in corso...")
 
-    # --- 📊 SEZIONE STORICO ORDINI E GUADAGNI (Richiesta dell'utente) ---
+    # --- 📊 SEZIONE STORICO ORDINI E GUADAGNI ---
     st.markdown("---")
     st.markdown("<h2 style='color:#d1d4dc;'>📜 Monitoraggio Operazioni Real-Time</h2>", unsafe_allow_html=True)
     
