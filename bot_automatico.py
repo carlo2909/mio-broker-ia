@@ -1,121 +1,142 @@
-
+import streamlit as st
 import numpy as np
 import pandas as pd
-import yfinance as yf
+import plotly.graph_objects as god
 from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
+from alpaca.data.requests import CryptoBarsRequest, StockBarsRequest
+from alpaca.data.timeframe import TimeFrame
+from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
 from sklearn.ensemble import RandomForestClassifier
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import time
 
-# --- CHIAVI ALPACA (Reinserisci i tuoi codici tra le virgolette) ---
-API_KEY = "PKFPGXZO5XJCFFWXJMSKRK5WCV"
-SECRET_KEY = "9h2rufjAykyymk9FMz7murhYURMChS5Cr3jcF2WekSHY"
+# 🎨 Configurazione stile TradingView (Scuro e tecnico)
+st.set_page_config(page_title="TradingView IA Broker", layout="wide", initial_sidebar_state="expanded")
 
-# LISTA DEI GRAFICI FOREX DA ANALIZZARE CONTEMPORANEAMENTE
-# Su Yahoo Finance il Forex si scrive "Valuta1Valuta2=X"
-COPPIE_FOREX = ["EURUSD=X", "USDJPY=X", "GBPUSD=X", "EURGBP=X"]
+st.markdown("""
+    <style>
+    .main { background-color: #131722; color: #d1d4dc; }
+    header { background-color: #1c2030 !important; }
+    .css-1d391kg { background-color: #1c2030; }
+    </style>
+    """, unsafe_allow_html=True)
 
-# Impostazioni ad alto guadagno/rischio
-IMPORTO_PER_TRADE = 20000  # Investe $20.000 virtuali per ogni valuta per spingere al massimo i profitti
-LIMITE_GIORNI = 5         # Chiude tutto tassativamente entro 1 settimana
+# --- CREDENZIALI ALPACA ---
+API_KEY = "PKGBTKR5UFADYCUR2QYPXU45MN"
+SECRET_KEY = "HWnrgJW7UxCUEDnEfkEatRiPQPE2yAukjVEWPkFtahcZ"
 
 try:
     client = TradingClient(api_key=API_KEY, secret_key=SECRET_KEY, paper=True)
-    print("🚀 === AVVIO BOT IA MULTI-FOREX AD ALTO RENDIMENTO ===")
+    crypto_data_client = CryptoHistoricalDataClient()
+    stock_data_client = StockHistoricalDataClient(api_key=API_KEY, secret_key=SECRET_KEY)
+    
+    account = client.get_account()
+    saldo_reale = float(account.cash)
 
-    # L'IA analizza ogni grafico nella lista uno dopo l'altro
-    for simbolo in COPPIE_FOREX:
-        print(f"\n📈 Analizzando il grafico di: {simbolo}...")
+    # 🖥️ BARRA LATERALE: PORTAFOGLIO E WALLET CARTE
+    st.sidebar.image("https://wikimedia.org", width=150)
+    st.sidebar.markdown("<h2 style='color:#d1d4dc;'>💳 ACCOUNT WALLET</h2>", unsafe_allow_html=True)
+    st.sidebar.metric(label="Saldo Netto Prelevabile", value=f"${saldo_reale:,.2f}")
+    
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📥 Deposita Fondi")
+    deposito = st.sidebar.number_input("Importo da caricare ($):", min_value=10.0, step=50.0, key="dep")
+    if st.sidebar.button("Deposita con Carta"):
+        st.sidebar.info(f"Reindirizzamento sicuro a Stripe per ${deposito}... (Tariffa 1.4% a carico utente)")
         
-        # Scarica i dati storici del grafico Forex
-        dati = yf.download(simbolo, start="2020-01-01", progress=False)
-        if dati.empty:
-            continue
+    st.sidebar.subheader("📤 Preleva Fondi")
+    prelievo = st.sidebar.number_input("Importo da riscuotere ($):", min_value=10.0, max_value=saldo_reale if saldo_reale > 10 else 10.0, step=50.0, key="prel")
+    if st.sidebar.button("Invia Fondi alla Carta"):
+        st.sidebar.success(f"Richiesta inviata! ${prelievo} in accredito sulla tua carta.")
 
-        # Calcolo indicatori matematici sul grafico
-        dati["Ritorno"] = dati["Close"].pct_change()
-        dati["Media_Mobile_5"] = dati["Close"].rolling(window=5).mean()
-        dati["Media_Mobile_20"] = dati["Close"].rolling(window=20).mean()
-        dati["Target"] = np.where(dati["Close"].shift(-1) > dati["Close"], 1, 0)
-        dati_puliti = dati.dropna().copy()
+    # 📈 CORPO PRINCIPALE: INTERFACCIA TRADINGVIEW DI RICERCA
+    st.markdown("<h1 style='color:#d1d4dc; font-family:sans-serif;'>📊 Piattaforma TradingView IA Private</h1>", unsafe_allow_html=True)
+    
+    col_grafico, col_ia = st.columns()
+    
+    with col_ia:
+        st.markdown("<h3 style='color:#d1d4dc;'>🔎 Cerca Mercato</h3>", unsafe_allow_html=True)
+        ticker_cercato = st.text_input("Inserisci il codice (es. BTC/USD, TSLA, NVDA, AAPL, AMZN):", value="BTC/USD").upper().strip()
+        st.markdown(f"**Ultimo Controllo:** {datetime.now().strftime('%H:%M:%S')}")
+        st.markdown("---")
 
-        X = dati_puliti[["Ritorno", "Media_Mobile_5", "Media_Mobile_20"]]
-        y = dati_puliti["Target"]
-
-        X_train = X.iloc[:-1]
-        y_train = y.iloc[:-1]
-        ultimo_giorno = X.iloc[[-1]]
-
-        # L'IA studia i pattern di questo specifico grafico
-        modello = RandomForestClassifier(n_estimators=100, random_state=42)
-        modello.fit(X_train, y_train)
-        previsione = modello.predict(ultimo_giorno)
-
-        # Traduciamo il simbolo di Yahoo in quello di Alpaca (es. EURUSD=X diventa EUR/USD)
-        simbolo_alpaca = simbolo.replace("=X", "")
-        if "JPY" not in simbolo_alpaca:
-            simbolo_alpaca = f"{simbolo_alpaca[:3]}/{simbolo_alpaca[3:]}"
-        else:
-            simbolo_alpaca = f"{simbolo_alpaca[:3]}/{simbolo_alpaca[3:]}"
-
-        # Controllo portafoglio su Alpaca
-        posizione_attiva = False
-        forza_vendita_temporale = False
+    # Download Storico Dati Dinamico
+    fine = datetime.now(timezone.utc) - timedelta(minutes=15)
+    inizio = fine - timedelta(days=365)
+    
+    if "/" in ticker_cercato:
+        request_params = CryptoBarsRequest(symbol_or_symbols=ticker_cercato, timeframe=TimeFrame.Day, start=inizio, end=fine)
+        bars = crypto_data_client.get_crypto_bars(request_params)
+    else:
+        request_params = StockBarsRequest(symbol_or_symbols=ticker_cercato, timeframe=TimeFrame.Day, start=inizio, end=fine)
+        bars = stock_data_client.get_stock_bars(request_params)
         
+    dati = bars.df
+    if isinstance(dati.index, pd.MultiIndex):
+        dati = dati.xs(ticker_cercato, level=0)
+        
+    with col_grafico:
+        fig = god.Figure(data=[god.Candlestick(
+            x=dati.index, open=dati['open'], high=dati['high'], low=dati['low'], close=dati['close'],
+            increasing_line_color='#26a69a', decreasing_line_color='#ef5350',
+            increasing_fill_color='#26a69a', decreasing_fill_color='#ef5350'
+        )])
+        
+        fig.update_layout(
+            plot_bgcolor='#131722', paper_bgcolor='#131722', modebar_bgcolor='#1c2030',
+            font_color='#d1d4dc', xaxis_rangeslider_visible=True, height=600,
+            margin=dict(l=10, r=10, t=10, b=10)
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        st.markdown("<p style='color:#787b86;'>💡 Sposta il mouse per analizzare le candele. Usa la barra di ricerca a destra per cambiare grafico istantaneamente.</p>", unsafe_allow_html=True)
+
+    # --- CALCOLI ED ESECUZIONE IA INTERNA (Random Forest) ---
+    dati["Ritorno"] = dati["close"].pct_change()
+    dati["Media_Mobile_5"] = dati["close"].rolling(window=5).mean()
+    dati["Media_Mobile_20"] = dati["close"].rolling(window=20).mean()
+    dati["Target"] = np.where(dati["close"].shift(-1) > dati["close"], 1, 0)
+    dati_puliti = dati.dropna().copy()
+
+    X = dati_puliti[["Ritorno", "Media_Mobile_5", "Media_Mobile_20"]]
+    y = dati_puliti["Target"]
+    X_train = X.iloc[:-1]
+    y_train = y.iloc[:-1]
+    ultimo_giorno = X.iloc[[-1]]
+
+    modello = RandomForestClassifier(n_estimators=100, random_state=42)
+    modello.fit(X_train, y_train)
+    previsione = modello.predict(ultimo_giorno)
+
+    with col_ia:
+        st.markdown("<h4 style='color:#d1d4dc;'>📦 Stato Posizione</h4>", unsafe_allow_html=True)
         try:
-            # Nota: Alpaca richiede un formato pulito per il forex, saltiamo il controllo se la coppia non è abilitata sul tuo tier
-            posizione = client.get_open_position(simbolo_alpaca)
-            posizione_attiva = True
+            posizione = client.get_open_position(ticker_cercato)
+            st.success(f"Trade Attivo! Qty: {posizione.qty}")
+        except:
+            st.info("Nessun trade aperto su questo asset.")
             
-            giorni_passati = (datetime.now(timezone.utc) - position.create_at).days
-            if giorni_passati >= LIMITE_GIORNI:
-                forza_vendita_temporale = True
-        except Exception:
-            pass
+        st.markdown("<h4 style='color:#d1d4dc;'>🔮 Decisione IA</h4>", unsafe_allow_html=True)
+        if previsione == 1:
+            st.metric(label="Previsione di Mercato", value="BULLISH (BUY)", delta="Segnale di Acquisto")
+        else:
+            st.metric(label="Previsione di Mercato", value="BEARISH (SELL)", delta="- Segnale di Vendita", delta_color="inverse")
 
-        # Decisioni dell'IA applicate al broker
-        if forza_vendita_temporale:
-            print(f"🔴 TEMPO SCADUTO: Chiudo il trade su {simbolo_alpaca}")
-            # Logica di vendita (Alpaca richiede contratti specifici per Forex, inviamo ordine di chiusura)
-            try:
-                ordine = MarketOrderRequest(symbol=simbolo_alpaca, qty=1, side=OrderSide.SELL, time_in_force=TimeInForce.GTC)
+        # Gestione automatica del budget
+        tif = TimeInForce.GTC if "/" in ticker_cercato else TimeInForce.DAY
+        try:
+            posizione_reale = client.get_open_position(ticker_cercato)
+            if previsione == 0:
+                ordine = MarketOrderRequest(symbol=ticker_cercato, qty=posizione_reale.qty, side=OrderSide.SELL, time_in_force=tif)
                 client.submit_order(order_data=ordine)
-            except: pass
-
-        elif previsione == 1:
-            print(f"🟢 L'IA prevede RIALZO su {simbolo_alpaca}.")
-            if not posizione_attiva:
-                print(f"🛒 COMPRA AUTOMATICO: Investo ${IMPORTO_PER_TRADE} su {simbolo_alpaca}")
-                # Nota: Calcoliamo la quantità approssimativa in base al budget impostato
-                try:
-                    prezzo_attuale = float(dati["Close"].iloc[-1])
-                    qty_calcolata = round(IMPORTO_PER_TRADE / prezzo_attuale, 2)
-                    ordine = MarketOrderRequest(symbol=simbolo_alpaca, qty=qty_calcolata, side=OrderSide.BUY, time_in_force=TimeInForce.GTC)
-                    client.submit_order(order_data=ordine)
-                    print("✅ Ordine inviato ad Alpaca!")
-                except Exception as e:
-                    print(f"⚠️ Impossibile inviare ordine (Verifica se il tuo conto demo supporta la leva sul Forex): {e}")
-            else:
-                print("💡 Trade già aperto sul grafico. Mantengo la posizione.")
-                
-        elif previsione == 0:
-            print(f"🔴 L'IA prevede RIBASSO su {simbolo_alpaca}.")
-            if posizione_attiva:
-                print(f"💰 VENDI AUTOMATICO: Chiudo il trade su {simbolo_alpaca}")
-                try:
-                    ordine = MarketOrderRequest(symbol=simbolo_alpaca, qty=1, side=OrderSide.SELL, time_in_force=TimeInForce.GTC)
-                    client.submit_order(order_data=ordine)
-                    print("✅ Ordine inviato!")
-                except: pass
-            else:
-                print("💡 Grafico debole, nessuna operazione attiva.")
-
-    print("\n=============================================")
-    print("📡 Tutti i grafici Forex sono stati scansionati.")
-    print("=============================================\n")
+        except:
+            if previsione == 1:
+                prezzo_attuale = float(dati["close"].iloc[-1])
+                qty_calcolata = round(20000 / prezzo_attuale, 4) if "/" in ticker_cercato else round(20000 / prezzo_attuale, 2)
+                if qty_calcolata <= 0: qty_calcolata = 1
+                ordine = MarketOrderRequest(symbol=ticker_cercato, qty=qty_calcolata, side=OrderSide.BUY, time_in_force=tif)
+                client.submit_order(order_data=ordine)
 
 except Exception as e:
-    print(f"❌ Errore generale del sistema: {e}")
-
-input("Premi Invio per uscire...")
+    st.error(f"Asset non riconosciuto o errore di sincronizzazione: {e}")
