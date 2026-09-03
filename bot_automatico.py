@@ -61,8 +61,7 @@ try:
         
     fig = god.Figure(data=[god.Candlestick(
         x=dati_grafico['timestamp'], open=dati_grafico['open'], high=dati_grafico['high'], low=dati_grafico['low'], close=dati_grafico['close'],
-        increasing_line_color='#2ec4b6', decreasing_line_color='#e63946',
-        increasing_fill_color='#2ec4b6', decreasing_fill_color='#e63946', line_width=2
+        increasing_line_color='#2ec4b6', decreasing_line_color='#e63946', line_width=2
     )])
     
     fig.update_layout(
