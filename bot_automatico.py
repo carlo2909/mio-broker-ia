@@ -2,10 +2,8 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as god
+import yfinance as yf
 from alpaca.trading.client import TradingClient
-from alpaca.data.timeframe import TimeFrame
-from alpaca.data.requests import CryptoBarsRequest, StockBarsRequest
-from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
 from datetime import datetime, timedelta, timezone
 
 st.set_page_config(page_title="TradingView & Alpaca Ecosystem", layout="wide", initial_sidebar_state="collapsed")
@@ -28,9 +26,6 @@ SECRET_KEY = "HWnrgJW7UxCUEDnEfkEatRiPQPE2yAukjVEWPkFtahcZ"
 
 try:
     client = TradingClient(api_key=API_KEY, secret_key=SECRET_KEY, paper=True)
-    crypto_data_client = CryptoHistoricalDataClient()
-    stock_data_client = StockHistoricalDataClient(api_key=API_KEY, secret_key=SECRET_KEY)
-    
     account = client.get_account()
     saldo_reale = float(account.cash)
     importo_dinamico = saldo_reale * 0.20
@@ -38,24 +33,15 @@ try:
 
     st.markdown("<div style='padding: 10px 20px; background:#f8f9fd; border-bottom:1px solid #e0e3eb; font-size:13px; margin-bottom:20px;'>💼 <b>Money Management Attivo:</b> Budget Dinamico Interesse Composto (20%): <b>$" + f"{importo_dinamico:,.2f}" + "</b></div>", unsafe_allow_html=True)
 
-    # --- 📈 GRAFICO INTERNO NATIVO IN STILE TRADINGVIEW SCURO ---
-    st.markdown("<h3 style='font-size: 16px; font-weight: 600; color: #131722; margin-left: 10px;'>📊 GRAFICO A CANDELE (REAL-TIME FEED)</h3>", unsafe_allow_html=True)
-    
-    fine = datetime.now(timezone.utc) - timedelta(minutes=15)
-    inizio = fine - timedelta(days=45)
+    # --- 📈 GRAFICO INTERACTIVE NATIVO CON LINEA DI EMERGENZA YAHOO FINANCE ---
+    st.markdown("<h3 style='font-size: 16px; font-weight: 600; color: #131722; margin-left: 10px;'>📊 GRAFICO A CANDELE BTC/USD (REAL-TIME FEED)</h3>", unsafe_allow_html=True)
     
     try:
-        request_params = CryptoBarsRequest(symbol_or_symbols="BTC/USD", timeframe=TimeFrame.Day, start=inizio, end=fine)
-        bars = crypto_data_client.get_crypto_bars(request_params)
-        dati = bars.df
-        if isinstance(dati.index, pd.MultiIndex):
-            dati = dati.xs("BTC/USD", level=0)
-            
-        dati_grafico = dati.reset_index()
-        dati_grafico['timestamp'] = pd.to_datetime(dati_grafico['timestamp']).dt.date
-            
+        # Scarica i dati istantaneamente da Yahoo Finance (Super stabile e veloce)
+        dati_yf = yf.download("BTC-USD", period="60d", interval="1d")
+        
         fig = god.Figure(data=[god.Candlestick(
-            x=dati_grafico['timestamp'], open=dati_grafico['open'], high=dati_grafico['high'], low=dati_grafico['low'], close=dati_grafico['close'],
+            x=dati_yf.index, open=dati_yf['Open'], high=dati_yf['High'], low=dati_yf['Low'], close=dati_yf['Close'],
             increasing_line_color='#2ec4b6', decreasing_line_color='#e63946',
             increasing_fill_color='#2ec4b6', decreasing_fill_color='#e63946', line_width=1.8
         )])
@@ -68,7 +54,7 @@ try:
         )
         st.plotly_chart(fig, use_container_width=True)
     except:
-        st.info("Caricamento dati di mercato del grafico...")
+        st.info("Sincronizzazione dei dati di mercato in corso...")
         
     st.markdown("<br>", unsafe_allow_html=True)
 
